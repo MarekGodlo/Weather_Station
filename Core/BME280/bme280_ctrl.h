@@ -9,9 +9,9 @@
 
 #ifndef WEATHER_STATION_BME280_CTRL_H
 #define WEATHER_STATION_BME280_CTRL_H
+#include "BME_Driver/bme280_defs.h"
 #include <stdbool.h>
 #include "main.h"
-#include "BME_Driver/bme280_defs.h"
 
 /**
  * @brief Represents the internal phases of the BME280 measurement state machine.
@@ -21,18 +21,9 @@ typedef enum {
     BME280_PHASE_START_MEASUREMENT, /**< Measurement is being triggered on the sensor. */
     BME280_PHASE_WAIT,              /**< Waiting for the sensor to finish measuring. */
     BME280_PHASE_READ_DATA,         /**< Reading the measured data from the sensor. */
-    BME280_PHASE_DONE               /**< Data is ready and waiting to be retrieved. */
+    BME280_PHASE_DONE,              /**< Data is ready and waiting to be retrieved. */
+    BME280_PHASE_ERROR              /**< An error has occurred; must be cleared before continuing. */
 } BME280_Phase_t;
-
-/**
- * @brief Represents the externally visible state of the BME280 handler.
- */
-typedef enum {
-    BME280_STATE_RESET = 0, /**< Handler has not been initialized yet. */
-    BME280_STATE_IDLE,      /**< Handler is initialized and ready to start a measurement. */
-    BME280_STATE_BUSY,      /**< A measurement cycle is currently in progress. */
-    BME280_STATE_ERROR      /**< An unrecoverable error occurred. */
-} BME280_State_t;
 
 /**
  * @brief Represents the status of the BME280 driver's operations.
@@ -41,8 +32,20 @@ typedef enum {
     BME280_STATUS_OK = 0,  /**< Successful. */
     BME280_STATUS_BUSY,    /**< A measurement is in progress or unread data is pending. */
     BME280_STATUS_ERROR,   /**< Operation failed. */
-    BME280_STATUS_NULL_PTR /**< A required argument was NULL. */
+    BME280_STATUS_NULL_ARG /**< A required argument was NULL. */
 } BME280_Status_t;
+
+/**
+ * @brief Represents the error codes recorded by the BME280 internal state machine.
+ */
+typedef enum {
+    BME280_ERROR_NONE = 0,       /**< No error has occurred. */
+    BME280_ERROR_COMM_FAIL,      /**< Communication with the device failed. */
+    BME280_ERROR_INVALID_CONFIG, /**< The requested configuration could not be applied. */
+    BME280_ERROR_PARSE_FAIL,     /**< Failed to parse or compensate the measurement data. */
+    BME280_ERROR_INVALID_PHASE,  /**< Operation requested is not valid in the current phase. */
+    BME280_ERROR_OTHER           /**< An unspecified error occurred. */
+} BME280_Error_t;
 
 /**
  * @brief Represents the compensated sensor measurement data.
@@ -77,11 +80,14 @@ typedef struct {
  * @brief Represents the internal state machine context.
  */
 typedef struct {
-    BME280_State_t state; /**< Externally visible state. */
     BME280_Phase_t phase; /**< Current internal phase of the measurement cycle. */
+
+    bool is_busy;              /**< True if a measurement is currently in progress. */
+    BME280_Error_t last_error; /**< Last error recorded by the state machine. */
+
     uint32_t deadline_us; /**< Required delay before the measurement is ready, in microseconds. */
     uint32_t now_us;      /**< Timestamp taken when the measurement was started, in microseconds. */
-} BME280_Ctx_t;
+} BME280_Contex_t;
 
 /**
  * @brief Represents the BME280 sensor handler.
@@ -89,7 +95,7 @@ typedef struct {
 typedef struct {
     struct bme280_dev dev;  /**< Bosch BME280 driver device structure. */
     BME280_Intf_t intf;     /**< Hardware interface configuration. */
-    BME280_Ctx_t ctx;       /**< Internal state machine context. */
+    BME280_Contex_t ctx;    /**< Internal state machine context. */
     BME280_Data_t data;     /**< Last compensated measurement data. */
     BME280_Config_t config; /**< User-configurable measurement settings. */
 } BME280_Handle_t;
@@ -97,35 +103,13 @@ typedef struct {
 /**
  * @brief Initializes the BME280 handler by setting default values and configuring the sensor.
  *
- * @param hbme     Pointer to the BME280 handler.
- * @param htim     Pointer to the Timer handler.
- * @param hi2c     Pointer to the I2C handler.
- * @param i2c_addr I2C address of the BME280.
+ * @param hbme Pointer to the BME280 handler.
+ * @param config Pointer to the measurement configuration to apply.
+ * @param intf   Pointer to the hardware interface configuration.
+ *
  * @return BME280_STATUS_OK on success, error status otherwise.
  */
-BME280_Status_t BME280_Init(BME280_Handle_t *hbme, TIM_HandleTypeDef *htim, I2C_HandleTypeDef *hi2c, uint8_t i2c_addr);
-
-/**
- * @brief Sets new values for sensor oversampling and IIR filter coefficient.
- *
- * @note For osr_temp, osr_hum, osr_press:
- *       BME280_OVERSAMPLING_1X - BME280_OVERSAMPLING_MAX
- *       For disable: BME280_NO_OVERSAMPLING
- *
- *       For filter:
- *       BME280_FILTER_COEFF_2 - BME280_FILTER_COEFF_16
- *       For disable: BME280_FILTER_COEFF_OFF
- *
- * @note Standby time is not configurable, as the sensor operates in forced mode.
- *
- * @param hbme      Pointer to the BME280 handler.
- * @param osr_temp  Oversampling value for temperature.
- * @param osr_hum   Oversampling value for humidity.
- * @param osr_press Oversampling value for pressure.
- * @param filter    IIR filter coefficient.
- * @return BME280_STATUS_OK on success, error status otherwise.
- */
-BME280_Status_t BME280_SetOversampling(BME280_Handle_t *hbme, uint8_t osr_temp, uint8_t osr_hum, uint8_t osr_press, uint8_t filter);
+BME280_Status_t BME280_Init(BME280_Handle_t *hbme, const BME280_Config_t *config, const BME280_Intf_t *intf);
 
 /**
  * @brief Starts a measurement by triggering the state machine.
@@ -135,14 +119,14 @@ BME280_Status_t BME280_SetOversampling(BME280_Handle_t *hbme, uint8_t osr_temp, 
  * @retval BME280_STATUS_BUSY     A measurement is already in progress or unread data is pending.
  * @retval BME280_STATUS_NULL_PTR hbme is NULL.
  */
-BME280_Status_t BME280_StartMeasurement_Async(BME280_Handle_t *hbme);
+BME280_Status_t BME280_StartMeas_Async(BME280_Handle_t *hbme);
 
 /**
- * @brief Checks if sensor is busy.
+ * @brief Checks if the sensor is busy.
  *
  * @param hbme Pointer to the BME280 handler.
  * @retval true  The sensor is currently busy.
- * @retval false The sensor is not busy, or param is NULL.
+ * @retval false The sensor is not busy, or the param is NULL.
  */
 bool BME280_IsBusy(const BME280_Handle_t *hbme);
 
@@ -167,10 +151,39 @@ bool BME280_IsDataReady(const BME280_Handle_t *hbme);
 BME280_Status_t BME280_GetData(BME280_Handle_t *hbme, BME280_Data_t *data);
 
 /**
+ * @brief Checks whether the internal state machine has an error.
+ *
+ * @param hbme Pointer to the BME280 handle.
+ *
+ * @return True if an error is present, false otherwise
+ *         (including when hbme is NULL).
+ */
+bool BME280_HasError(const BME280_Handle_t *hbme);
+
+/**
+ * @brief Returns the last error recorded by the internal state machine.
+ *
+ * @param hbme Pointer to the BME280 handle.
+ *
+ * @return The last recorded error, or BME280_ERROR_NONE if hbme is NULL
+ */
+BME280_Error_t BME280_GetError(const BME280_Handle_t *hbme);
+
+/**
+ * @brief Clears the error state and resets the internal state machine to idle.
+ *
+ * @param hbme Pointer to the BME280 handle.
+ *
+ * @return Status of the operation.
+ * @retval BME280_STATUS_OK       Operation completed successfully.
+ * @retval BME280_STATUS_NULL_ARG Null pointer passed as argument
+ */
+BME280_Status_t BME280_ClearError(BME280_Handle_t *hbme);
+
+/**
  * @brief Manages the state machine; controls the measurement process.
  *
  * @param hbme Pointer to the BME280 handler.
- * @return BME280_STATUS_OK on success, error status otherwise.
  */
-BME280_Status_t BME280_Task(BME280_Handle_t *hbme);
+void BME280_Task(BME280_Handle_t *hbme);
 #endif //WEATHER_STATION_BME280_CTRL_H

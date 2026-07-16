@@ -32,7 +32,17 @@ message("Build type: " ${CMAKE_BUILD_TYPE})
 enable_language(C ASM)
 
 # Create an executable object type
-add_executable(${CMAKE_PROJECT_NAME})
+add_executable(${CMAKE_PROJECT_NAME}
+        Core/Img/img_background.h
+        Core/Img/icon.h
+        Core/BME280/BME_Driver/bme280.c
+        Core/BME280/BME_Driver/bme280.h
+        Core/BME280/BME_Driver/bme280_defs.h
+        Core/BME280/bme280_ctrl.c
+        Core/BME280/bme280_ctrl.h
+        Core/Systim/systim.c
+        Core/Systim/systim.h
+)
 
 # Add STM32CubeMX generated sources
 add_subdirectory(cmake/stm32cubemx)

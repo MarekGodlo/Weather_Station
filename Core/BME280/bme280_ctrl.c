@@ -4,7 +4,7 @@
  * Created on 14.07.2026.
  * @author Marek Godlowicz https://github.com/MarekGodlo
  * @brief Non-blocking driver for the BME280 sensor, built on top of the
- *       Bosch BME280 API, exposing a polling-based state machine interface.
+ *        Bosch BME280 API, exposing a polling-based state machine interface.
  */
 
 #include "bme280_ctrl.h"
@@ -14,188 +14,226 @@
 #include "../Systim/systim.h"
 #include "BME_Driver/bme280.h"
 
-static BME280_Status_t start_measurement(BME280_Handle_t *hbme, uint32_t *req_delay);
-static BME280_Status_t read_data_from_sensor(BME280_Handle_t *hbme);
+static void handle_start_meas_phase(BME280_Handle_t *hbme);
+static void handle_wait_phase(BME280_Handle_t *hbme);
+static void handle_read_data_phase(BME280_Handle_t *hbme);
+static void handle_error_phase(BME280_Handle_t *hbme);
+
+static BME280_Error_t start_measurement(BME280_Handle_t *hbme, uint32_t *req_delay);
+static BME280_Error_t read_data_from_sensor(BME280_Handle_t *hbme);
 
 static int8_t apply_setting_to_device(BME280_Handle_t *hbme, struct bme280_settings *settings);
 static bool parse_data(const struct bme280_data *raw_data, BME280_Data_t *comp_data);
-static void set_default_settings(BME280_Handle_t *hbme);
 
-static BME280_Status_t handle_error(BME280_Handle_t *hbme);
-
+// Low-Level hardware interface
 static void delay_us(uint32_t period, void *intf_ptr);
 static BME280_INTF_RET_TYPE write_data(uint8_t reg_addr, const uint8_t *reg_data, uint32_t len, void *intf_ptr);
 static BME280_INTF_RET_TYPE read_data(uint8_t reg_addr, uint8_t *reg_data, uint32_t len, void *intf_ptr);
 
-BME280_Status_t BME280_Init(BME280_Handle_t *hbme, TIM_HandleTypeDef *htim, I2C_HandleTypeDef *hi2c, const uint8_t i2c_addr) {
-    if (hbme == NULL) {
-        return BME280_STATUS_NULL_PTR;
+BME280_Status_t BME280_Init(BME280_Handle_t *hbme, const BME280_Config_t *config, const BME280_Intf_t *intf) {
+    assert_param(hbme != NULL);
+    assert_param(config != NULL);
+    assert_param(intf != NULL);
+
+    if (hbme == NULL || config == NULL || intf == NULL) {
+        return BME280_STATUS_NULL_ARG;
     }
 
-    assert_param(hbme != NULL);
-    assert_param(hi2c != NULL);
-    assert_param(htim != NULL);
+    hbme->intf = *intf;
+    hbme->config = *config;
 
-    hbme->intf.htim = htim;
-    hbme->intf.hi2c = hi2c;
-    hbme->intf.i2c_addr = i2c_addr;
-
+    // configures library struct
     hbme->dev.delay_us = delay_us;
     hbme->dev.write = write_data;
     hbme->dev.read = read_data;
     hbme->dev.intf = BME280_I2C_INTF;
     hbme->dev.intf_ptr = &hbme->intf;
 
-    hbme->ctx.state = BME280_STATE_RESET;
-
-    set_default_settings(hbme);
-
     const int8_t rslt = bme280_init(&hbme->dev);
-    if (rslt != BME280_OK) return handle_error(hbme);
+    if (rslt != BME280_OK) {
+        return BME280_STATUS_ERROR;
+    }
 
-    hbme->ctx.state = BME280_STATE_IDLE;
+    // sets default values
+    hbme->ctx.is_busy = false;
+    hbme->ctx.phase = BME280_PHASE_IDLE;
+    hbme->ctx.now_us = 0;
+    hbme->ctx.deadline_us = 0;
     return BME280_STATUS_OK;
 }
 
-BME280_Status_t BME280_SetOversampling(BME280_Handle_t *hbme, const uint8_t osr_temp, const uint8_t osr_hum, const uint8_t osr_press, const uint8_t filter) {
-    if (hbme == NULL) {
-        return BME280_STATUS_NULL_PTR;
-    }
-
+BME280_Status_t BME280_StartMeas_Async(BME280_Handle_t *hbme) {
     assert_param(hbme != NULL);
 
-    hbme->config.osr_temp = osr_temp;
-    hbme->config.osr_hum = osr_hum;
-    hbme->config.osr_press = osr_press;
-    hbme->config.filter = filter;
-    hbme->config.dirty = true;
-    return BME280_STATUS_OK;
-}
-
-BME280_Status_t BME280_StartMeasurement_Async(BME280_Handle_t *hbme) {
     if (hbme == NULL) {
-        return BME280_STATUS_NULL_PTR;
+        return BME280_STATUS_NULL_ARG;
     }
 
-    assert_param(hbme != NULL);
-
-    if (hbme->ctx.state == BME280_STATE_BUSY || hbme->ctx.phase == BME280_PHASE_DONE) return BME280_STATUS_BUSY;
+    if (hbme->ctx.is_busy) {
+        return BME280_STATUS_BUSY;
+    }
 
     hbme->ctx.phase = BME280_PHASE_START_MEASUREMENT;
-    hbme->ctx.state = BME280_STATE_BUSY;
+    hbme->ctx.is_busy = true;
     return BME280_STATUS_OK;
-}
-
-bool BME280_IsBusy(const BME280_Handle_t *hbme) {
-    if (hbme == NULL) return false;
-    assert_param(hbme != NULL);
-
-    return hbme->ctx.state == BME280_STATE_BUSY;
 }
 
 bool BME280_IsDataReady(const BME280_Handle_t *hbme) {
-    if (hbme == NULL) return false;
     assert_param(hbme != NULL);
+
+    if (hbme == NULL) {
+        return false;
+    }
 
     return hbme->ctx.phase == BME280_PHASE_DONE;
 }
 
 BME280_Status_t BME280_GetData(BME280_Handle_t *hbme, BME280_Data_t *data) {
-    if (hbme == NULL || data == NULL) {
-        return BME280_STATUS_NULL_PTR;
-    }
     assert_param(hbme != NULL);
     assert_param(data != NULL);
 
-    if (hbme->ctx.phase != BME280_PHASE_DONE) return BME280_STATUS_BUSY;
+    if (hbme == NULL || data == NULL) {
+        return BME280_STATUS_NULL_ARG;
+    }
 
     *data = hbme->data;
     hbme->ctx.phase = BME280_PHASE_IDLE;
+    hbme->ctx.is_busy = false;
     return BME280_STATUS_OK;
 }
 
-BME280_Status_t BME280_Task(BME280_Handle_t *hbme) {
-    if (hbme == NULL) return BME280_STATUS_NULL_PTR;
+bool BME280_HasError(const BME280_Handle_t *hbme) {
+    if (hbme == NULL) return false;
+
+    return hbme->ctx.phase == BME280_PHASE_ERROR;
+}
+
+BME280_Error_t BME280_GetError(const BME280_Handle_t *hbme) {
+    if (hbme == NULL) return BME280_ERROR_NONE;
+
+    return hbme->ctx.last_error;
+}
+
+BME280_Status_t BME280_ClearError(BME280_Handle_t *hbme) {
+    assert_param(hbme != NULL);
+
+    if (hbme == NULL) {
+        return BME280_STATUS_NULL_ARG;
+    }
+
+    hbme->ctx.last_error = BME280_ERROR_NONE;
+    hbme->ctx.phase = BME280_PHASE_IDLE;
+    hbme->ctx.is_busy = false;
+    return BME280_STATUS_OK;
+}
+
+void BME280_Task(BME280_Handle_t *hbme) {
     assert_param(hbme != NULL);
 
     switch (hbme->ctx.phase) {
-        case BME280_PHASE_IDLE:
-            // nothing to do
+        case BME280_PHASE_IDLE: // nothing to do
             break;
-        case BME280_PHASE_START_MEASUREMENT:
-            if (start_measurement(hbme, &hbme->ctx.deadline_us) != BME280_STATUS_OK) {
-                return handle_error(hbme);
-            }
-
-            hbme->ctx.now_us = Systim_GetUs();
-            hbme->ctx.phase = BME280_PHASE_WAIT;
+        case BME280_PHASE_START_MEASUREMENT: handle_start_meas_phase(hbme);
             break;
-        case BME280_PHASE_WAIT:
-            if (Systim_GetUs() - hbme->ctx.now_us >= hbme->ctx.deadline_us) {
-                hbme->ctx.phase = BME280_PHASE_READ_DATA;
-            }
+        case BME280_PHASE_WAIT: handle_wait_phase(hbme);
             break;
-        case BME280_PHASE_READ_DATA:
-            if (read_data_from_sensor(hbme) != BME280_STATUS_OK) {
-                return handle_error(hbme);
-            }
-
-            hbme->ctx.phase = BME280_PHASE_DONE;
-            // hbme->ctx.state is reset to IDLE by BME280_GetData(), not here.
+        case BME280_PHASE_READ_DATA: handle_read_data_phase(hbme);
             break;
-        case BME280_PHASE_DONE:
-            // nothing to do
+        case BME280_PHASE_DONE: // nothing to do
+            break;
+        case BME280_PHASE_ERROR: handle_error_phase(hbme);
             break;
         default:
-            return handle_error(hbme);
+            hbme->ctx.last_error = BME280_ERROR_INVALID_PHASE;
+            hbme->ctx.phase = BME280_PHASE_ERROR;
     }
-
-    return BME280_STATUS_OK;
 }
 
-static BME280_Status_t start_measurement(BME280_Handle_t *hbme, uint32_t *req_delay) {
+static void handle_start_meas_phase(BME280_Handle_t *hbme) {
+    assert_param(hbme != NULL);
+
+    const BME280_Error_t error = start_measurement(hbme, &hbme->ctx.deadline_us);
+
+    if (error != BME280_ERROR_NONE) {
+        hbme->ctx.last_error = error;
+        hbme->ctx.phase = BME280_PHASE_ERROR;
+        return;
+    }
+
+    hbme->ctx.now_us = Systim_GetUs();
+    hbme->ctx.phase = BME280_PHASE_WAIT;
+}
+
+static void handle_wait_phase(BME280_Handle_t *hbme) {
+    assert_param(hbme != NULL);
+
+    if (Systim_GetUs() - hbme->ctx.now_us >= hbme->ctx.deadline_us) {
+        hbme->ctx.phase = BME280_PHASE_READ_DATA;
+    }
+}
+
+static void handle_read_data_phase(BME280_Handle_t *hbme) {
+    assert_param(hbme != NULL);
+
+    const BME280_Error_t error = read_data_from_sensor(hbme);
+
+    if (error != BME280_ERROR_NONE) {
+        hbme->ctx.last_error = error;
+        hbme->ctx.phase = BME280_PHASE_ERROR;
+        return;
+    }
+
+    hbme->ctx.phase = BME280_PHASE_DONE;
+}
+
+static void handle_error_phase(BME280_Handle_t *hbme) {
+    assert_param(hbme != NULL);
+
+    hbme->ctx.is_busy = false;
+}
+
+static BME280_Error_t start_measurement(BME280_Handle_t *hbme, uint32_t *req_delay) {
     assert_param(hbme != NULL);
     assert_param(req_delay != NULL);
 
     struct bme280_settings settings;
     int8_t rslt;
 
-    if (hbme->config.dirty) {
-        // sync new settings to the sensor (I2C write)
-        rslt = apply_setting_to_device(hbme, &settings);
-        if (rslt != BME280_OK) return handle_error(hbme);
-        hbme->config.dirty = false;
-    } else {
-        // reuse settings already applied to the sensor
-        settings.osr_p = hbme->config.osr_press;
-        settings.osr_h = hbme->config.osr_hum;
-        settings.osr_t = hbme->config.osr_temp;
-        settings.filter = hbme->config.filter;
+    rslt = apply_setting_to_device(hbme, &settings);
+    if (rslt != BME280_OK) {
+        return BME280_ERROR_INVALID_CONFIG;
     }
+    hbme->config.dirty = false;
 
     rslt = bme280_set_sensor_mode(BME280_POWERMODE_FORCED, &hbme->dev);
-    if (rslt != BME280_OK) return handle_error(hbme);
+    if (rslt != BME280_OK) {
+        return BME280_ERROR_COMM_FAIL;
+    }
 
     rslt = bme280_cal_meas_delay(req_delay, &settings);
-    if (rslt != BME280_OK) return handle_error(hbme);
+    if (rslt != BME280_OK) {
+        return BME280_ERROR_COMM_FAIL;
+    }
 
-    return BME280_STATUS_OK;
+    return BME280_ERROR_NONE;
 }
 
-static BME280_Status_t read_data_from_sensor(BME280_Handle_t *hbme) {
+static BME280_Error_t read_data_from_sensor(BME280_Handle_t *hbme) {
     assert_param(hbme != NULL);
 
     struct bme280_data data;
     int8_t rslt;
 
     rslt = bme280_get_sensor_data(BME280_ALL, &data, &hbme->dev);
+    if (rslt != BME280_OK) {
+        return BME280_ERROR_COMM_FAIL;
+    }
 
-    if (rslt != BME280_OK) return handle_error(hbme);
+    if (!parse_data(&data, &hbme->data)) {
+        return BME280_ERROR_PARSE_FAIL;
+    }
 
-    if (!parse_data(&data, &hbme->data)) return handle_error(hbme);
-
-    hbme->ctx.state = BME280_STATE_IDLE;
-    return BME280_STATUS_OK;
+    return BME280_ERROR_NONE;
 }
 
 static int8_t apply_setting_to_device(BME280_Handle_t *hbme, struct bme280_settings *settings) {
@@ -239,23 +277,6 @@ static bool parse_data(const struct bme280_data *raw_data, BME280_Data_t *comp_d
     comp_data->temperature = raw_data->temperature;
 
     return true;
-}
-
-static void set_default_settings(BME280_Handle_t *hbme) {
-    assert_param(hbme != NULL);
-
-    hbme->config.osr_press = BME280_OVERSAMPLING_1X;
-    hbme->config.osr_hum = BME280_OVERSAMPLING_1X;
-    hbme->config.osr_temp = BME280_OVERSAMPLING_1X;
-    hbme->config.filter = BME280_FILTER_COEFF_OFF;
-    hbme->config.dirty = true;
-}
-
-static BME280_Status_t handle_error(BME280_Handle_t *hbme) {
-    assert_param(hbme != NULL);
-
-    hbme->ctx.state = BME280_STATE_ERROR;
-    return BME280_STATUS_ERROR;
 }
 
 /** @name Low-Level hardware interface (BME280 driver callbacks) **/

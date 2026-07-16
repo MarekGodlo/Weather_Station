@@ -33,14 +33,16 @@ set(MX_Application_Src
 set(STM32_Drivers_Src
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/system_stm32u3xx.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32U3xx_HAL_Driver/Src/stm32u3xx_hal_cortex.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32U3xx_HAL_Driver/Src/stm32u3xx_hal_i2c.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32U3xx_HAL_Driver/Src/stm32u3xx_hal_i2c_ex.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32U3xx_HAL_Driver/Src/stm32u3xx_hal_dma.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32U3xx_HAL_Driver/Src/stm32u3xx_hal_dma_ex.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32U3xx_HAL_Driver/Src/stm32u3xx_hal.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32U3xx_HAL_Driver/Src/stm32u3xx_hal_rcc.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32U3xx_HAL_Driver/Src/stm32u3xx_hal_rcc_ex.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32U3xx_HAL_Driver/Src/stm32u3xx_hal_flash.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32U3xx_HAL_Driver/Src/stm32u3xx_hal_flash_ex.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32U3xx_HAL_Driver/Src/stm32u3xx_hal_gpio.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32U3xx_HAL_Driver/Src/stm32u3xx_hal_dma.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32U3xx_HAL_Driver/Src/stm32u3xx_hal_dma_ex.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32U3xx_HAL_Driver/Src/stm32u3xx_hal_exti.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32U3xx_HAL_Driver/Src/stm32u3xx_hal_pwr.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32U3xx_HAL_Driver/Src/stm32u3xx_hal_pwr_ex.c
@@ -50,10 +52,10 @@ set(STM32_Drivers_Src
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32U3xx_HAL_Driver/Src/stm32u3xx_hal_spi_ex.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32U3xx_HAL_Driver/Src/stm32u3xx_hal_tim.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32U3xx_HAL_Driver/Src/stm32u3xx_hal_tim_ex.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32U3xx_HAL_Driver/Src/stm32u3xx_hal_uart.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32U3xx_HAL_Driver/Src/stm32u3xx_hal_uart_ex.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32U3xx_HAL_Driver/Src/stm32u3xx_hal_usart.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32U3xx_HAL_Driver/Src/stm32u3xx_hal_usart_ex.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32U3xx_HAL_Driver/Src/stm32u3xx_hal_uart_ex.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/STM32U3xx_HAL_Driver/Src/stm32u3xx_hal_uart.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Drivers/BSP/STM32U3xx_Nucleo/stm32u3xx_nucleo.c
 )
 
