@@ -30,7 +30,6 @@ extern "C" {
 #include "stm32u3xx_hal.h"
 
 #include "stm32u3xx_nucleo.h"
-#include <stdio.h>
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */

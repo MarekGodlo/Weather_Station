@@ -55,7 +55,7 @@
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
-
+extern I2C_HandleTypeDef hi2c3;
 /* USER CODE BEGIN EV */
 
 /* USER CODE END EV */
@@ -199,17 +199,17 @@ void SysTick_Handler(void)
 /******************************************************************************/
 
 /**
-  * @brief This function handles EXTI Line13 interrupt.
+  * @brief This function handles I2C3 event interrupt.
   */
-void EXTI13_IRQHandler(void)
+void I2C3_EV_IRQHandler(void)
 {
-  /* USER CODE BEGIN EXTI13_IRQn 0 */
+  /* USER CODE BEGIN I2C3_EV_IRQn 0 */
 
-  /* USER CODE END EXTI13_IRQn 0 */
-  BSP_PB_IRQHandler(BUTTON_USER);
-  /* USER CODE BEGIN EXTI13_IRQn 1 */
+  /* USER CODE END I2C3_EV_IRQn 0 */
+  HAL_I2C_EV_IRQHandler(&hi2c3);
+  /* USER CODE BEGIN I2C3_EV_IRQn 1 */
 
-  /* USER CODE END EXTI13_IRQn 1 */
+  /* USER CODE END I2C3_EV_IRQn 1 */
 }
 
 /* USER CODE BEGIN 1 */
