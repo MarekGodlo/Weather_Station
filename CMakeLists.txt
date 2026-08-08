@@ -42,6 +42,13 @@ add_executable(${CMAKE_PROJECT_NAME}
         Core/BME280/bme280_ctrl.h
         Core/Systim/systim.c
         Core/Systim/systim.h
+        Core/DS18B20/ds18b20.c
+        Core/DS18B20/ds18b20.h
+        Core/OneWire/onewire.c
+        Core/OneWire/onewire.h
+        Core/OneWire/onewire_defs.h
+        Core/CRC8/crc8.c
+        Core/CRC8/crc8.h
 )
 
 # Add STM32CubeMX generated sources
