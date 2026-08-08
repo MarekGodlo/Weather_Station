@@ -38,7 +38,13 @@ extern "C" {
 
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
-
+/**
+ * @brief Represents a single GPIO pin.
+ */
+typedef struct {
+  uint16_t pin; /**< Pin number. */
+  GPIO_TypeDef *port;   /**< GPIO port. */
+} GPIO_Pin_t;
 /* USER CODE END ET */
 
 /* Exported constants --------------------------------------------------------*/
@@ -63,6 +69,8 @@ void Error_Handler(void);
 #define RCC_OSC32_IN_GPIO_Port GPIOC
 #define RCC_OSC32_OUT_Pin GPIO_PIN_15
 #define RCC_OSC32_OUT_GPIO_Port GPIOC
+#define OW_DATA_Pin GPIO_PIN_0
+#define OW_DATA_GPIO_Port GPIOB
 #define EPD_RES_Pin GPIO_PIN_6
 #define EPD_RES_GPIO_Port GPIOC
 #define EPD_DC_Pin GPIO_PIN_7

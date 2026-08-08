@@ -24,10 +24,13 @@
 #include <stdio.h>
 
 #include "../BME280/bme280_ctrl.h"
+// #include "../DS18B20/ds18b20.h"
 #include <sys/types.h>
 
 #include "stm32u3xx_it.h"
+#include "../DS18B20/ds18b20.h"
 #include "../Systim/systim.h"
+#include "../OneWire/onewire.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -52,11 +55,20 @@ I2C_HandleTypeDef hi2c3;
 SPI_HandleTypeDef hspi2;
 
 TIM_HandleTypeDef htim2;
+TIM_HandleTypeDef htim7;
 
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
+static const GPIO_Pin_t ow_data_pin = {
+  .pin = OW_DATA_Pin,
+  .port = OW_DATA_GPIO_Port
+};
+
 static BME280_Handle_t hbme;
+
+OneWire_Handle_t how;
+DS18B20_Handle_t hds;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -65,9 +77,13 @@ static void MX_GPIO_Init(void);
 static void MX_SPI2_Init(void);
 static void MX_I2C3_Init(void);
 static void MX_USART1_UART_Init(void);
+static void MX_TIM7_Init(void);
 static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
+static void Bus_OneWire_Init(void);
+
 static void Sensor_BME280_Init(void);
+static void Sensor_DS18B20_Init(void);
 static void Timer_SysTim_Init(void);
 /* USER CODE END PFP */
 
@@ -81,6 +97,12 @@ int __io_putchar(int ch) {
 
   HAL_UART_Transmit(&huart1, (uint8_t *) &ch, 1, 1000);
   return 1;
+}
+
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
+  if (htim == &htim7) {
+    OneWire_OnTimerCplt(&how);
+  }
 }
 /* USER CODE END 0 */
 
@@ -116,10 +138,13 @@ int main(void)
   MX_SPI2_Init();
   MX_I2C3_Init();
   MX_USART1_UART_Init();
+  MX_TIM7_Init();
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
+  Bus_OneWire_Init();
 
   Sensor_BME280_Init();
+  Sensor_DS18B20_Init();
   Timer_SysTim_Init();
   // Systim_Init(&htim2);
 
@@ -136,22 +161,31 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   Systim_Start();
+  DS18B20_StartMeas_Async(&hds);
   BME280_StartMeas_Async(&hbme);
 
   BME280_Data_t data = {0};
 
   while (1)
   {
+    DS18B20_Task(&hds);
     BME280_Task(&hbme);
 
     if (BME280_HasError(&hbme)) {
       const BME280_Error_t error = BME280_GetError(&hbme);
       printf("BME280 error: %d\n", error);
       BME280_ClearError(&hbme);
-    } else if (BME280_IsDataReady(&hbme)) {
+    } else if (DS18B20_HasError(&hds)) {
+      const DS18B20_Error_t error = DS18B20_GetError(&hds);
+      printf("DS18B20 error: %d\n", error);
+      DS18B20_ClearError(&hds);
+    } else if (DS18B20_IsDataReady(&hds) && BME280_IsDataReady(&hbme)) {
+      float temp;
+      DS18B20_GetData(&hds, &temp);
       BME280_GetData(&hbme, &data);
 
       printf("\n");
+      printf("DS18B20: %d.%dC\n", (int) temp, (int) ((temp - (int) temp) * 100));
       printf("BME280:\n");
       printf("press: %d.%dPa\n", (int) data.pressure, (int) ((data.pressure - (int) data.pressure) * 100));
       printf("hum: %d.%d%%\n", (int) data.humidity, (int) ((data.humidity - (int) data.humidity) * 100));
@@ -381,6 +415,44 @@ static void MX_TIM2_Init(void)
 }
 
 /**
+  * @brief TIM7 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM7_Init(void)
+{
+
+  /* USER CODE BEGIN TIM7_Init 0 */
+
+  /* USER CODE END TIM7_Init 0 */
+
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM7_Init 1 */
+
+  /* USER CODE END TIM7_Init 1 */
+  htim7.Instance = TIM7;
+  htim7.Init.Prescaler = 96-1;
+  htim7.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim7.Init.Period = 65535;
+  htim7.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim7) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim7, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM7_Init 2 */
+
+  /* USER CODE END TIM7_Init 2 */
+
+}
+
+/**
   * @brief USART1 Initialization Function
   * @param None
   * @retval None
@@ -446,6 +518,9 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOA_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(OW_DATA_GPIO_Port, OW_DATA_Pin, GPIO_PIN_SET);
+
+  /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(EPD_RES_GPIO_Port, EPD_RES_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin Output Level */
@@ -453,6 +528,13 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(EPD_CS_GPIO_Port, EPD_CS_Pin, GPIO_PIN_SET);
+
+  /*Configure GPIO pin : OW_DATA_Pin */
+  GPIO_InitStruct.Pin = OW_DATA_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(OW_DATA_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : EPD_RES_Pin EPD_DC_Pin */
   GPIO_InitStruct.Pin = EPD_RES_Pin|EPD_DC_Pin;
@@ -496,6 +578,20 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+static void Bus_OneWire_Init(void) {
+  OneWire_Status_t status;
+
+  OneWire_Config_t config = {0};
+  config.data_pin = &ow_data_pin;
+  config.bus_mode = OW_ROM_MODE_SKIP;
+  config.htim = &htim7;
+
+  status = OneWire_Init(&how, &config);
+  if (status != OW_STATUS_OK) {
+    Error_Handler();
+  }
+}
+
 static void Sensor_BME280_Init(void) {
   BME280_Status_t status;
 
@@ -512,6 +608,15 @@ static void Sensor_BME280_Init(void) {
 
   status = BME280_Init(&hbme, &config, &intf);
   if (status != BME280_STATUS_OK) {
+    Error_Handler();
+  }
+}
+
+static void Sensor_DS18B20_Init(void) {
+  DS18B20_Status_t status;
+
+  status = DS18B20_Init(&hds, &how);
+  if (status != DS18B20_STATUS_OK) {
     Error_Handler();
   }
 }
