@@ -33,8 +33,6 @@ enable_language(C ASM)
 
 # Create an executable object type
 add_executable(${CMAKE_PROJECT_NAME}
-        Core/Img/img_background.h
-        Core/Img/icon.h
         Core/BME280/BME_Driver/bme280.c
         Core/BME280/BME_Driver/bme280.h
         Core/BME280/BME_Driver/bme280_defs.h
@@ -49,6 +47,17 @@ add_executable(${CMAKE_PROJECT_NAME}
         Core/OneWire/onewire_defs.h
         Core/CRC8/crc8.c
         Core/CRC8/crc8.h
+        Core/EPD/epd.c
+        Core/EPD/epd.h
+        Core/EPD/EPD_Driver/uc8253.c
+        Core/EPD/EPD_Driver/uc8253.h
+        Core/GFX/gfx.c
+        Core/GFX/gfx.h
+        Core/GFX/Font/font_defs.h
+        Core/GFX/Bitmap/bitmap_defs.h
+        Core/UI/ui_ctrl.c
+        Core/UI/ui_ctrl.h
+        Core/UI/ui_defs.h
 )
 
 # Add STM32CubeMX generated sources
