@@ -24,23 +24,39 @@
 #include <stdio.h>
 
 #include "../BME280/bme280_ctrl.h"
-// #include "../DS18B20/ds18b20.h"
 #include <sys/types.h>
 
 #include "stm32u3xx_it.h"
 #include "../DS18B20/ds18b20.h"
+#include "../UI/ui_ctrl.h"
+
 #include "../Systim/systim.h"
 #include "../OneWire/onewire.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
+typedef enum {
+  PHASE_INIT,
+  PHASE_MEASURE,
+  PHASE_RENDER,
+  PHASE_SLEEP,
+  PHASE_ERROR,
+} Phase_t;
 
+typedef struct {
+  GPIO_Pin_t cs;
+  GPIO_Pin_t dc;
+  GPIO_Pin_t busy;
+  GPIO_Pin_t res;
+} EPD_Pins_t;
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define EPD_WIDTH 240
+#define EPD_HEIGHT 416
+#define EPD_SIZE ((EPD_WIDTH * EPD_HEIGHT)/8)
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -65,10 +81,26 @@ static const GPIO_Pin_t ow_data_pin = {
   .port = OW_DATA_GPIO_Port
 };
 
+static const EPD_Pins_t epd_pins = {
+  .cs = { .pin = EPD_CS_Pin, .port = EPD_CS_GPIO_Port},
+  .dc = { .pin = EPD_DC_Pin, .port = EPD_DC_GPIO_Port},
+  .busy = { .pin = EPD_BUSY_Pin, .port = EPD_BUSY_GPIO_Port},
+  .res = { .pin = EPD_RES_Pin, .port = EPD_RES_GPIO_Port}
+};
+
 static BME280_Handle_t hbme;
 
 OneWire_Handle_t how;
 DS18B20_Handle_t hds;
+
+
+UI_Ctrl_Handle_t hui;
+EPD_Handle_t hepd;
+
+uint8_t gfx_buffer[EPD_SIZE];
+uint8_t epd_buffer[EPD_SIZE];
+
+Phase_t current_phase = PHASE_INIT;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -85,6 +117,7 @@ static void Bus_OneWire_Init(void);
 static void Sensor_BME280_Init(void);
 static void Sensor_DS18B20_Init(void);
 static void Timer_SysTim_Init(void);
+static void UI_EPD_Init(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -141,55 +174,83 @@ int main(void)
   MX_TIM7_Init();
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
+  Timer_SysTim_Init();
+
   Bus_OneWire_Init();
 
   Sensor_BME280_Init();
   Sensor_DS18B20_Init();
-  Timer_SysTim_Init();
-  // Systim_Init(&htim2);
 
+  UI_EPD_Init();
   /* USER CODE END 2 */
 
   /* Initialize leds */
   BSP_LED_Init(LED_GREEN);
 
+  /* Infinite loop */
+  /* USER CODE BEGIN WHILE */
   for (uint8_t i = 0; i < 6; i++) {
     BSP_LED_Toggle(LED_GREEN);
     HAL_Delay(100);
   }
 
-  /* Infinite loop */
-  /* USER CODE BEGIN WHILE */
   Systim_Start();
   DS18B20_StartMeas_Async(&hds);
   BME280_StartMeas_Async(&hbme);
 
   BME280_Data_t data = {0};
+  float temp = 0;
 
-  while (1)
-  {
-    DS18B20_Task(&hds);
-    BME280_Task(&hbme);
+  current_phase = PHASE_MEASURE;
 
-    if (BME280_HasError(&hbme)) {
-      const BME280_Error_t error = BME280_GetError(&hbme);
-      printf("BME280 error: %d\n", error);
-      BME280_ClearError(&hbme);
-    } else if (DS18B20_HasError(&hds)) {
-      const DS18B20_Error_t error = DS18B20_GetError(&hds);
-      printf("DS18B20 error: %d\n", error);
-      DS18B20_ClearError(&hds);
-    } else if (DS18B20_IsDataReady(&hds) && BME280_IsDataReady(&hbme)) {
-      float temp;
-      DS18B20_GetData(&hds, &temp);
-      BME280_GetData(&hbme, &data);
+  while (1) {
+    switch (current_phase) {
+      case PHASE_MEASURE: {
+        DS18B20_Task(&hds);
+        BME280_Task(&hbme);
 
-      printf("\n");
-      printf("DS18B20: %d.%dC\n", (int) temp, (int) ((temp - (int) temp) * 100));
-      printf("BME280:\n");
-      printf("press: %d.%dPa\n", (int) data.pressure, (int) ((data.pressure - (int) data.pressure) * 100));
-      printf("hum: %d.%d%%\n", (int) data.humidity, (int) ((data.humidity - (int) data.humidity) * 100));
-      printf("temp: %d.%dC\n", (int) data.temperature, (int) ((data.temperature - (int) data.temperature) * 100));
+        if (BME280_HasError(&hbme)) {
+          const BME280_Error_t error = BME280_GetError(&hbme);
+          printf("BME280 error: %d\n", error);
+          BME280_ClearError(&hbme);
+
+          current_phase = PHASE_ERROR;
+        } else if (DS18B20_HasError(&hds)) {
+          const DS18B20_Error_t error = DS18B20_GetError(&hds);
+          printf("DS18B20 error: %d\n", error);
+          DS18B20_ClearError(&hds);
+
+          current_phase = PHASE_ERROR;
+        } else if (DS18B20_IsDataReady(&hds) && BME280_IsDataReady(&hbme)) {
+          DS18B20_GetData(&hds, &temp);
+          BME280_GetData(&hbme, &data);
+
+          current_phase = PHASE_RENDER;
+        }
+
+        break;
+      }
+      case PHASE_RENDER: {
+        UI_Ctrl_DisplayStaticElements(&hui);
+        UI_Ctrl_DisplayValues(&hui, data.temperature, data.humidity, data.pressure, temp);
+        UI_Ctrl_Status_t status = UI_Ctrl_Update(&hui);
+
+        if (status != UI_CTRL_OK) {
+          current_phase = PHASE_ERROR;
+        }
+
+        current_phase = PHASE_SLEEP;
+        break;
+      }
+      case PHASE_SLEEP: {
+        // nothing to do
+      }
+      case PHASE_ERROR: {
+        BSP_LED_On(LED_GREEN);
+      }
+      default:
+        current_phase = PHASE_ERROR;
+        break;
     }
     /* USER CODE END WHILE */
 
@@ -197,6 +258,7 @@ int main(void)
   }
   /* USER CODE END 3 */
 }
+
 
 /**
   * @brief System Clock Configuration
@@ -578,6 +640,30 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+static void UI_EPD_Init(void) {
+  UC8253_Handle_t huc8253 = {0};
+  huc8253.busy = epd_pins.busy;
+  huc8253.cs = epd_pins.cs;
+  huc8253.dc = epd_pins.dc;
+  huc8253.res = epd_pins.res;
+  huc8253.hspi = &hspi2;
+  huc8253.height = EPD_HEIGHT;
+  huc8253.width = EPD_WIDTH;
+
+  EPD_Config_t epd_config = {0};
+  epd_config.frame_buffer = epd_buffer;
+  epd_config.gfx_buffer = gfx_buffer;
+  epd_config.frame_size = EPD_SIZE;
+  epd_config.hdrv = huc8253;
+  epd_config.display_rotation = GFX_ROTATION_270;
+
+  hui.hepd = &hepd;
+
+  if (UI_Ctrl_Init(&hui, &epd_config) != UI_CTRL_OK) {
+    Error_Handler();
+  }
+}
+
 static void Bus_OneWire_Init(void) {
   OneWire_Status_t status;
 
@@ -642,6 +728,7 @@ void Error_Handler(void)
   __disable_irq();
   while (1)
   {
+    BSP_LED_On(LED_GREEN);
   }
   /* USER CODE END Error_Handler_Debug */
 }

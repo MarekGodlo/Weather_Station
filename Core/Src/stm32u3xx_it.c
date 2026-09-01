@@ -90,6 +90,8 @@ void HardFault_Handler(void)
   while (1)
   {
     /* USER CODE BEGIN W1_HardFault_IRQn 0 */
+    BSP_LED_On(LED_GREEN);
+    HAL_Delay(1000);
     /* USER CODE END W1_HardFault_IRQn 0 */
   }
 }
