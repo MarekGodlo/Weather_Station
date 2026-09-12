@@ -1,10 +1,10 @@
 /**
-* @file systim.c
-*
-* Created on 14.07.2026.
-* @author Marek Godlowicz https://github.com/MarekGodlo
-* @brief
-*/
+ * @file systim.c
+ *
+ * Created on 14.07.2026.
+ * @author Marek Godlowicz https://github.com/MarekGodlo
+ * @brief System timer utility for microsecond precision timing.
+ */
 
 #include "systim.h"
 
