@@ -54,6 +54,14 @@ _Min_Stack_Size = 0x400; /* required amount of stack */
 /* Sections */
 SECTIONS
 {
+  /* Data retained across Standby mode */
+  .retained :
+  {
+    . = ALIGN(4);
+    KEEP(*(.retained))
+    . = ALIGN(4);
+  } >RAM2
+
   /* The startup code into "FLASH" Rom type memory */
   .isr_vector :
   {
