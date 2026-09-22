@@ -18,6 +18,7 @@ static void handle_req_scratchpad_phase(DS18B20_Handle_t *hds);
 static void handle_read_scratchpad_phase(DS18B20_Handle_t *hds);
 static void handle_error_phase(DS18B20_Handle_t *hds);
 
+static DS18B20_Error_t validate_scratchpad(const uint8_t *scratchpad);
 
 DS18B20_Status_t DS18B20_Init(DS18B20_Handle_t *hds, OneWire_Handle_t *how) {
     assert_param(hds != NULL);
@@ -220,14 +221,14 @@ static void handle_read_scratchpad_phase(DS18B20_Handle_t *hds) {
     const OneWire_OpStatus_t op_status = OneWire_GetOperationStatus(hds->how);
 
     if (op_status == OW_OPERATION_COMPLETE) {
-        const uint8_t checksum = CRC8_Maxim(hds->scratchpad, 8);
+        DS18B20_Error_t error = validate_scratchpad(hds->scratchpad);
 
-        if (checksum == hds->scratchpad[8]) {
+        if (error == DS18B20_ERROR_NONE) {
             hds->ctx.op_started = false;
             hds->ctx.phase = DS18B20_PHASE_DONE;
         } else {
             hds->ctx.phase = DS18B20_PHASE_ERROR;
-            hds->ctx.last_error = DS18B20_ERROR_CRC;
+            hds->ctx.last_error = error;
         }
     } else if (op_status == OW_OPERATION_ERROR) {
         hds->ctx.phase = DS18B20_PHASE_ERROR;
@@ -237,4 +238,25 @@ static void handle_read_scratchpad_phase(DS18B20_Handle_t *hds) {
 
 static void handle_error_phase(DS18B20_Handle_t *hds) {
     hds->ctx.op_started = false;
+}
+
+static DS18B20_Error_t validate_scratchpad(const uint8_t *scratchpad) {
+    bool all_zero = true;
+    for (int i = 0; i < 9; i++) {
+        if (scratchpad[i] != 0x00) {
+            all_zero = false;
+            break;
+        }
+    }
+    if (all_zero) {
+        return DS18B20_ERROR_COMM_FAIL;
+    }
+
+    const uint8_t checksum = CRC8_Maxim(scratchpad, 8);
+
+    if (checksum != scratchpad[8]) {
+        return DS18B20_ERROR_CRC;
+    }
+
+    return DS18B20_ERROR_NONE;
 }
