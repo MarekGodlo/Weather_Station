@@ -58,6 +58,10 @@ add_executable(${CMAKE_PROJECT_NAME}
         Core/UI/ui_ctrl.c
         Core/UI/ui_ctrl.h
         Core/UI/ui_defs.h
+        Core/PowerManager/pwr_manager.c
+        Core/PowerManager/pwr_manager.h
+        Core/AppLogic/app_logic.c
+        Core/AppLogic/app_logic.h
 )
 
 # Add STM32CubeMX generated sources
