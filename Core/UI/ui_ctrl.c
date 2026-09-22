@@ -17,12 +17,14 @@
 
 #define FLOAT_TO_DECI(_f_val) ((int16_t)((_f_val) * 10.0f))
 #define FLOAT_TO_CENTI(_f_val) ((int16_t)((_f_val) * 100.0f))
+#define PA_TO_HPA_INT(_f_val) ((int32_t)((_f_val) / 100.0f))
 
 static void clear_text_box(const UI_Ctrl_Handle_t *hui, int16_t text_x, int16_t text_y, UI_TextLayout_t text_box);
 
 static void display_temp_value(UI_Ctrl_Handle_t *hui, UI_Pos_t value_pos, int16_t centi_degree);
 static void display_hum_value(UI_Ctrl_Handle_t *hui, UI_Pos_t value_pos, int16_t deci_degree);
 static void display_pres_value(UI_Ctrl_Handle_t *hui, UI_Pos_t value_pos, uint16_t hpa);
+static void display_error_value(UI_Ctrl_Handle_t *hui, UI_Pos_t value_pos, const char *error_msg);
 
 static void display_temp_icon(const UI_Ctrl_Handle_t *hui, UI_Pos_t icon_pos);
 static void display_droplet_icon(const UI_Ctrl_Handle_t *hui, UI_Pos_t icon_pos);
@@ -61,14 +63,20 @@ void UI_Ctrl_DisplayStaticElements(UI_Ctrl_Handle_t *hui) {
     display_temp_icon(hui, ui_static_icons[UI_ICON_TEMP_OUT]);
 }
 
-void UI_Ctrl_DisplayValues(UI_Ctrl_Handle_t *hui, const float temp_in, const float humidity_in, const uint32_t pressure_in, const float temp_out) {
+void UI_Ctrl_DisplayValues(UI_Ctrl_Handle_t *hui, const float *temp_in, const float *humidity_in, const uint32_t *pressure_in, const float *temp_out) {
     assert_param(hui != NULL);
 
-    display_temp_value(hui, ui_layout_dynamic[UI_DYN_TEMP_IN], FLOAT_TO_CENTI(temp_in));
-    display_hum_value(hui, ui_layout_dynamic[UI_DYN_HUM_IN], FLOAT_TO_DECI(humidity_in));
-    display_pres_value(hui, ui_layout_dynamic[UI_DYN_PRESS_IN], pressure_in/100);
+    if (temp_in) display_temp_value(hui, ui_layout_dynamic[UI_DYN_TEMP_IN], FLOAT_TO_CENTI(*temp_in));
+    else display_error_value(hui, ui_layout_dynamic[UI_DYN_TEMP_IN], UI_VALUE_ERR_MSG);
 
-    display_temp_value(hui, ui_layout_dynamic[UI_DYN_TEMP_OUT], FLOAT_TO_CENTI(temp_out));
+    if (humidity_in) display_hum_value(hui, ui_layout_dynamic[UI_DYN_HUM_IN], FLOAT_TO_DECI(*humidity_in));
+    else display_error_value(hui, ui_layout_dynamic[UI_DYN_HUM_IN], UI_VALUE_ERR_MSG);
+
+    if (pressure_in) display_pres_value(hui, ui_layout_dynamic[UI_DYN_PRESS_IN], PA_TO_HPA_INT(*pressure_in));
+    else display_error_value(hui, ui_layout_dynamic[UI_DYN_PRESS_IN], UI_VALUE_ERR_MSG);
+
+    if (temp_out) display_temp_value(hui, ui_layout_dynamic[UI_DYN_TEMP_OUT], FLOAT_TO_CENTI(*temp_out));
+    else display_error_value(hui, ui_layout_dynamic[UI_DYN_TEMP_OUT], UI_VALUE_ERR_MSG);
 }
 
 UI_Ctrl_Status_t UI_Ctrl_Update(const UI_Ctrl_Handle_t *hui) {
@@ -121,6 +129,10 @@ static void display_hum_value(UI_Ctrl_Handle_t *hui, const UI_Pos_t value_pos, c
 
 static void display_pres_value(UI_Ctrl_Handle_t *hui, const UI_Pos_t value_pos, const uint16_t hpa) {
     display_value(hui, value_pos.x, value_pos.y, value_layout, "%dhPa", hpa);
+}
+
+static void display_error_value(UI_Ctrl_Handle_t *hui, const UI_Pos_t value_pos, const char *error_msg) {
+    display_value(hui, value_pos.x, value_pos.y, value_layout, error_msg);
 }
 
 static void display_temp_icon(const UI_Ctrl_Handle_t *hui, const UI_Pos_t icon_pos) {

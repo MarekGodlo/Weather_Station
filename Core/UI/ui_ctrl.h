@@ -45,16 +45,21 @@ UI_Ctrl_Status_t UI_Ctrl_Init(const UI_Ctrl_Handle_t *hui, const EPD_Config_t *c
  */
 void UI_Ctrl_DisplayStaticElements(UI_Ctrl_Handle_t *hui);
 
+
 /**
  * @brief Renders all dynamic elements into the GFX buffer (It is values).
  *
  * @param hui         Pointer to the UI_Ctrl handle structure.
- * @param temp_in     Internal temperature value, in degrees Celsius.
- * @param humidity_in Internal humidity value, in percent.
- * @param pressure_in Internal pressure value, in Pa.
- * @param temp_out    External temperature value, in degrees Celsius.
+ * @param temp_in     Pointer to the Internal temperature value, in degrees Celsius.
+ * @param humidity_in Pointer to the Internal humidity value, in percent.
+ * @param pressure_in Pointer to the Internal pressure value, in Pa.
+ * @param temp_out    Pointer to the External temperature value, in degrees Celsius.
+ *
+ * @note If any value pointer is NULL, an error placeholder (UI_VALUE_ERR_MSG) is displayed
+ *       for that field instead of the value.
  */
-void UI_Ctrl_DisplayValues(UI_Ctrl_Handle_t *hui, float temp_in, float humidity_in, uint32_t pressure_in, float temp_out);
+void UI_Ctrl_DisplayValues(UI_Ctrl_Handle_t *hui, const float *temp_in, const float *humidity_in,
+                           const uint32_t *pressure_in, const float *temp_out);
 
 /**
  * @brief Updates the e-paper display via full refresh.

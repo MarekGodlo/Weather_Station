@@ -13,6 +13,11 @@
 #include "../GFX/Font/FreeSans18pt8b.h"
 
 /**
+ * @brief Placeholder string displayed when a value pointer is NULL.
+ */
+#define UI_VALUE_ERR_MSG "N/A"
+
+/**
  * @brief Represents a 2D position on the screen.
  */
 typedef struct {
