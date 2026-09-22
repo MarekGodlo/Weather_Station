@@ -8,9 +8,13 @@
 
 #include "crc8.h"
 
+#include "main.h"
+
 static uint8_t crc8_maxim_update(uint8_t crc, uint8_t byte);
 
 uint8_t CRC8_Maxim(const uint8_t *data, const uint8_t len) {
+    assert_param(data != NULL);
+
     uint8_t crc = 0;
     for (uint8_t i = 0; i < len; i++)
         crc = crc8_maxim_update(crc, data[i]);

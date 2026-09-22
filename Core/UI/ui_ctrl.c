@@ -19,6 +19,8 @@
 #define FLOAT_TO_CENTI(_f_val) ((int16_t)((_f_val) * 100.0f))
 #define PA_TO_HPA_INT(_f_val) ((int32_t)((_f_val) / 100.0f))
 
+static bool validate_config(const EPD_Config_t *config);
+
 static void clear_text_box(const UI_Ctrl_Handle_t *hui, int16_t text_x, int16_t text_y, UI_TextLayout_t text_box);
 
 static void display_temp_value(UI_Ctrl_Handle_t *hui, UI_Pos_t value_pos, int16_t centi_degree);
@@ -41,6 +43,10 @@ UI_Ctrl_Status_t UI_Ctrl_Init(const UI_Ctrl_Handle_t *hui, const EPD_Config_t *c
      assert_param(hui != NULL);
      assert_param(config != NULL);
 
+    if (hui == NULL || !validate_config(config)) {
+        return UI_CTRL_NULL_ARG;
+    }
+
      if (EPD_Init(hui->hepd, config) != EPD_OK) {
          return UI_CTRL_INIT_ERR;
      };
@@ -50,6 +56,10 @@ UI_Ctrl_Status_t UI_Ctrl_Init(const UI_Ctrl_Handle_t *hui, const EPD_Config_t *c
 
 void UI_Ctrl_DisplayStaticElements(UI_Ctrl_Handle_t *hui) {
     assert_param(hui != NULL);
+
+    if (hui == NULL) {
+        return;
+    }
 
     display_background_lines(hui);
 
@@ -65,6 +75,10 @@ void UI_Ctrl_DisplayStaticElements(UI_Ctrl_Handle_t *hui) {
 
 void UI_Ctrl_DisplayValues(UI_Ctrl_Handle_t *hui, const float *temp_in, const float *humidity_in, const uint32_t *pressure_in, const float *temp_out) {
     assert_param(hui != NULL);
+
+    if (hui == NULL) {
+        return;
+    }
 
     if (temp_in) display_temp_value(hui, ui_layout_dynamic[UI_DYN_TEMP_IN], FLOAT_TO_CENTI(*temp_in));
     else display_error_value(hui, ui_layout_dynamic[UI_DYN_TEMP_IN], UI_VALUE_ERR_MSG);
@@ -82,6 +96,10 @@ void UI_Ctrl_DisplayValues(UI_Ctrl_Handle_t *hui, const float *temp_in, const fl
 UI_Ctrl_Status_t UI_Ctrl_Update(const UI_Ctrl_Handle_t *hui) {
     assert_param(hui != NULL);
 
+    if (hui == NULL) {
+        return UI_CTRL_NULL_ARG;
+    }
+
     if (EPD_UpdateDisplay(hui->hepd) != EPD_OK) {
         return UI_CTRL_UPDATE_ERR;
     }
@@ -92,11 +110,22 @@ UI_Ctrl_Status_t UI_Ctrl_Update(const UI_Ctrl_Handle_t *hui) {
 UI_Ctrl_Status_t UI_Ctrl_UpdatePartial(const UI_Ctrl_Handle_t *hui) {
     assert_param(hui != NULL);
 
+    if (hui == NULL) {
+        return UI_CTRL_NULL_ARG;
+    }
+
     if (EPD_UpdateDisplayPartial(hui->hepd) != EPD_OK) {
         return UI_CTRL_UPDATE_ERR;
     };
 
     return UI_CTRL_OK;
+}
+
+static bool validate_config(const EPD_Config_t *config) {
+    if (config == NULL) return false;
+    if (config->gfx_buffer == NULL) return false;
+    if (config->frame_buffer == NULL) return false;
+    return true;
 }
 
 static void display_background_lines(UI_Ctrl_Handle_t *hui) {

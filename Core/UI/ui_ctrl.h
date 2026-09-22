@@ -15,6 +15,7 @@
  */
 typedef enum {
     UI_CTRL_OK = 0,     /**< Operation finished successfully. */
+    UI_CTRL_NULL_ARG,   /**< A null pointer was passed as an argument. */
     UI_CTRL_INIT_ERR,   /**< Failed initialization procedure. */
     UI_CTRL_UPDATE_ERR, /**< Failed to update the display content. */
 } UI_Ctrl_Status_t;

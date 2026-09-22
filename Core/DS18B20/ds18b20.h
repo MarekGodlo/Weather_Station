@@ -35,7 +35,7 @@
 typedef enum {
     DS18B20_STATUS_OK = 0,  /**< Operation completed successfully. */
     DS18B20_STATUS_BUSY,    /**< Another operation is already in progress. */
-    DS18B20_STATUS_NULL_ARG /**< A null pointer was passed as argument. */
+    DS18B20_STATUS_NULL_ARG /**< A null pointer was passed as an argument. */
 } DS18B20_Status_t;
 
 /**

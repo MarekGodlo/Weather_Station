@@ -26,14 +26,17 @@ static void expand_dirty_region(EPD_Handle_t *hepd, GFX_Rect_t region);
 static EPD_Status_t refresh_display(EPD_Handle_t *hepd);
 static EPD_Status_t refresh_display_partial(EPD_Handle_t *hepd, uint16_t region_size, GFX_Rect_t region);
 
+static bool validate_config(const EPD_Config_t *config);
+
 EPD_Status_t EPD_Init(EPD_Handle_t *hepd, const EPD_Config_t *config) {
-    if (hepd == NULL || config == NULL) {
-        return EPD_NULL_ARG;
-    }
-    
+    assert_param(hepd != NULL);
+    assert_param(config != NULL);
     assert_param(config->frame_buffer != NULL);
     assert_param(config->gfx_buffer != NULL);
-    assert_param(config->hdrv != NULL);
+
+    if (hepd == NULL || !validate_config(config)) {
+        return EPD_NULL_ARG;
+    }
     
     const GFX_Config_t gfx_config = {
         .width = config->hdrv.width,
@@ -48,7 +51,10 @@ EPD_Status_t EPD_Init(EPD_Handle_t *hepd, const EPD_Config_t *config) {
     hepd->frame_size = config->frame_size;
     hepd->hdrv = config->hdrv;
 
-    memset(hepd->frame_buffer, 0xFF, hepd->frame_size);
+    // check if frame buffer was restored
+    if (!config->skip_frame_buf_clr) {
+        memset(hepd->frame_buffer, 0xFF, hepd->frame_size);
+    }
     memset(hepd->gfx_buffer, 0xFF, hepd->frame_size);
 
     hepd->dirty_region = (GFX_Rect_t) {0,0,0,0};
@@ -59,6 +65,8 @@ EPD_Status_t EPD_Init(EPD_Handle_t *hepd, const EPD_Config_t *config) {
 
 EPD_Status_t EPD_DrawHLine(EPD_Handle_t *hepd, const int16_t x, const int16_t y,
                            const uint16_t len, const uint16_t thickness, const uint8_t color) {
+    assert_param(hepd != NULL);
+
     if (hepd == NULL) {
         return EPD_NULL_ARG;
     }
@@ -79,6 +87,8 @@ EPD_Status_t EPD_DrawHLine(EPD_Handle_t *hepd, const int16_t x, const int16_t y,
 
 EPD_Status_t EPD_DrawVLine(EPD_Handle_t *hepd, const int16_t x, const int16_t y,
                            const uint16_t len, const uint16_t thickness, const uint8_t color) {
+    assert_param(hepd != NULL);
+
     if (hepd == NULL) {
         return EPD_NULL_ARG;
     }
@@ -99,6 +109,9 @@ EPD_Status_t EPD_DrawVLine(EPD_Handle_t *hepd, const int16_t x, const int16_t y,
 
 EPD_Status_t EPD_DrawChar(EPD_Handle_t *hepd, const int16_t x, const int16_t y,
                           const char c, const GFX_Font_t *font, const uint8_t color) {
+    assert_param(hepd != NULL);
+    assert_param(font != NULL);
+
     if (hepd == NULL || font == NULL) {
         return EPD_NULL_ARG;
     }
@@ -116,6 +129,9 @@ EPD_Status_t EPD_DrawChar(EPD_Handle_t *hepd, const int16_t x, const int16_t y,
 EPD_Status_t EPD_DrawCharBg(EPD_Handle_t *hepd, const int16_t x, const int16_t y,
                             const char c, const GFX_Font_t *font, const uint8_t color,
                             const uint8_t bg) {
+    assert_param(hepd != NULL);
+    assert_param(font != NULL);
+
     if (hepd == NULL || font == NULL) {
         return EPD_NULL_ARG;
     }
@@ -133,6 +149,10 @@ EPD_Status_t EPD_DrawCharBg(EPD_Handle_t *hepd, const int16_t x, const int16_t y
 
 EPD_Status_t EPD_DrawText(EPD_Handle_t *hepd, const int16_t x, const int16_t y,
                           const char *text, const GFX_Font_t *font, const uint8_t color) {
+    assert_param(hepd != NULL);
+    assert_param(text != NULL);
+    assert_param(font != NULL);
+
     if (hepd == NULL || text == NULL || font == NULL) {
         return EPD_NULL_ARG;
     }
@@ -150,6 +170,10 @@ EPD_Status_t EPD_DrawText(EPD_Handle_t *hepd, const int16_t x, const int16_t y,
 EPD_Status_t EPD_DrawTextBg(EPD_Handle_t *hepd, const int16_t x, const int16_t y,
                             const char *text, const GFX_Font_t *font, const uint8_t color,
                             const uint8_t bg) {
+    assert_param(hepd != NULL);
+    assert_param(text != NULL);
+    assert_param(font != NULL);
+
     if (hepd == NULL || text == NULL || font == NULL) {
         return EPD_NULL_ARG;
     }
@@ -168,6 +192,9 @@ EPD_Status_t EPD_DrawTextBg(EPD_Handle_t *hepd, const int16_t x, const int16_t y
 EPD_Status_t EPD_DrawBitmap(EPD_Handle_t *hepd, const int16_t x, const int16_t y,
                             const uint8_t *bitmap, const uint16_t w, const uint16_t h,
                             const uint8_t color) {
+    assert_param(hepd != NULL);
+    assert_param(bitmap != NULL);
+
     if (hepd == NULL || bitmap == NULL) {
         return EPD_NULL_ARG;
     }
@@ -189,6 +216,9 @@ EPD_Status_t EPD_DrawBitmap(EPD_Handle_t *hepd, const int16_t x, const int16_t y
 EPD_Status_t EPD_DrawBitmapBg(EPD_Handle_t *hepd, const int16_t x, const int16_t y,
                               const uint8_t *bitmap, const uint16_t w, const uint16_t h,
                               const uint8_t color, const uint8_t bg) {
+    assert_param(hepd != NULL);
+    assert_param(bitmap != NULL);
+
     if (hepd == NULL || bitmap == NULL) {
         return EPD_NULL_ARG;
     }
@@ -207,7 +237,10 @@ EPD_Status_t EPD_DrawBitmapBg(EPD_Handle_t *hepd, const int16_t x, const int16_t
     return EPD_OK;
 }
 
-EPD_Status_t EPD_FillRegion(EPD_Handle_t *hepd, const int16_t x, const int16_t y, const uint16_t w, const uint16_t h, const uint8_t color) {
+EPD_Status_t EPD_FillRegion(EPD_Handle_t *hepd, const int16_t x, const int16_t y,
+                            const uint16_t w, const uint16_t h, const uint8_t color) {
+    assert_param(hepd != NULL);
+
     if (hepd == NULL) {
         return EPD_NULL_ARG;
     }
@@ -227,6 +260,8 @@ EPD_Status_t EPD_FillRegion(EPD_Handle_t *hepd, const int16_t x, const int16_t y
 }
 
 EPD_Status_t EPD_UpdateDisplay(EPD_Handle_t *hepd) {
+    assert_param(hepd != NULL);
+
     if (hepd == NULL) {
         return EPD_NULL_ARG;
     }
@@ -244,6 +279,8 @@ EPD_Status_t EPD_UpdateDisplay(EPD_Handle_t *hepd) {
 }
 
 EPD_Status_t EPD_UpdateDisplayPartial(EPD_Handle_t *hepd) {
+    assert_param(hepd != NULL);
+
     if (hepd == NULL) {
         return EPD_NULL_ARG;
     }
@@ -258,6 +295,13 @@ EPD_Status_t EPD_UpdateDisplayPartial(EPD_Handle_t *hepd) {
     hepd->has_dirty_region = false;
 
     return EPD_OK;
+}
+
+static bool validate_config(const EPD_Config_t *config) {
+    if (config == NULL) return false;
+    if (config->gfx_buffer == NULL) return false;
+    if (config->frame_buffer == NULL) return false;
+    return true;
 }
 
 static EPD_Status_t update_region(EPD_Handle_t *hepd, GFX_Rect_t region) {

@@ -14,6 +14,8 @@
 #include "../Systim/systim.h"
 #include "BME_Driver/bme280.h"
 
+static bool validate_intf(const BME280_Intf_t *intf);
+
 static void handle_start_meas_phase(BME280_Handle_t *hbme);
 static void handle_wait_phase(BME280_Handle_t *hbme);
 static void handle_read_data_phase(BME280_Handle_t *hbme);
@@ -34,8 +36,10 @@ BME280_Status_t BME280_Init(BME280_Handle_t *hbme, const BME280_Config_t *config
     assert_param(hbme != NULL);
     assert_param(config != NULL);
     assert_param(intf != NULL);
+    assert_param(intf->hi2c != NULL);
+    assert_param(intf->htim != NULL);
 
-    if (hbme == NULL || config == NULL || intf == NULL) {
+    if (hbme == NULL || config == NULL || !validate_intf(intf)) {
         return BME280_STATUS_NULL_ARG;
     }
 
@@ -147,6 +151,13 @@ void BME280_Task(BME280_Handle_t *hbme) {
             hbme->ctx.last_error = BME280_ERROR_INVALID_PHASE;
             hbme->ctx.phase = BME280_PHASE_ERROR;
     }
+}
+
+static bool validate_intf(const BME280_Intf_t *intf) {
+    if (intf == NULL) return false;
+    if (intf->hi2c == NULL) return false;
+    if (intf->htim == NULL) return false;
+    return true;
 }
 
 static void handle_start_meas_phase(BME280_Handle_t *hbme) {

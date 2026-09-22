@@ -16,12 +16,12 @@
  */
 typedef struct {
     OneWire_RomMode_t bus_mode; /**< ROM command mode. */
-    GPIO_Pin_t *data_pin;       /**< One-Wire data line pin. */ 
+    const GPIO_Pin_t *data_pin; /**< One-Wire data line pin. */
     TIM_HandleTypeDef *htim;    /**< Timer used for One-Wire timing. */
 } OneWire_Config_t;
 
 /**
- * @brief Represents the One-Wire controller handler.
+ * @brief Represents the One-Wire controller handle.
  */
 typedef struct {
     OneWire_Config_t config;               /**< One-Wire hardware configuration. */

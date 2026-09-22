@@ -20,7 +20,10 @@ static void handle_error_phase(DS18B20_Handle_t *hds);
 
 
 DS18B20_Status_t DS18B20_Init(DS18B20_Handle_t *hds, OneWire_Handle_t *how) {
-    if (hds == NULL) {
+    assert_param(hds != NULL);
+    assert_param(how != NULL);
+
+    if (hds == NULL || how == NULL) {
         return DS18B20_STATUS_NULL_ARG;
     }
 
@@ -35,6 +38,8 @@ DS18B20_Status_t DS18B20_Init(DS18B20_Handle_t *hds, OneWire_Handle_t *how) {
 }
 
 DS18B20_Status_t DS18B20_StartMeas_Async(DS18B20_Handle_t *hds) {
+    assert_param(hds != NULL);
+
     if (hds == NULL) {
         return DS18B20_STATUS_NULL_ARG;
     }
@@ -50,12 +55,17 @@ DS18B20_Status_t DS18B20_StartMeas_Async(DS18B20_Handle_t *hds) {
 }
 
 bool DS18B20_IsDataReady(const DS18B20_Handle_t *hds) {
+    assert_param(hds != NULL);
+
     if (hds == NULL) return false;
 
     return hds->ctx.phase == DS18B20_PHASE_DONE;
 }
 
 DS18B20_Status_t DS18B20_GetData(DS18B20_Handle_t *hds, float *temp) {
+    assert_param(hds != NULL);
+    assert_param(temp != NULL);
+
     if (hds == NULL || temp == NULL) {
         return DS18B20_STATUS_NULL_ARG;
     }
@@ -71,18 +81,24 @@ DS18B20_Status_t DS18B20_GetData(DS18B20_Handle_t *hds, float *temp) {
 }
 
 bool DS18B20_HasError(const DS18B20_Handle_t *hds) {
+    assert_param(hds != NULL);
+
     if (hds == NULL) return false;
 
     return hds->ctx.phase == DS18B20_PHASE_ERROR;
 }
 
 DS18B20_Error_t DS18B20_GetError(const DS18B20_Handle_t *hds) {
+    assert_param(hds != NULL);
+
     if (hds == NULL) return DS18B20_ERROR_NONE;
 
     return hds->ctx.last_error;
 }
 
 DS18B20_Status_t DS18B20_ClearError(DS18B20_Handle_t *hds) {
+    assert_param(hds != NULL);
+
     if (hds == NULL) return DS18B20_STATUS_NULL_ARG;
 
     hds->ctx.last_error = DS18B20_ERROR_NONE;
@@ -94,6 +110,8 @@ DS18B20_Status_t DS18B20_ClearError(DS18B20_Handle_t *hds) {
 }
 
 void DS18B20_Task(DS18B20_Handle_t *hds) {
+    assert_param(hds != NULL);
+
     switch (hds->ctx.phase) {
         case DS18B20_PHASE_IDLE: // nothing to do
             break;

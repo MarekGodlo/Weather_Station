@@ -19,9 +19,13 @@ static void clear_all_flags(void);
 
 __attribute__((__section__(".retained"))) static PwrManager_Retained_t retained;
 
-void PwrManager_Init(PwrManager_Handle_t *hpwr, RTC_HandleTypeDef *hrtc) {
+HAL_StatusTypeDef PwrManager_Init(PwrManager_Handle_t *hpwr, RTC_HandleTypeDef *hrtc) {
     assert_param(hpwr != NULL);
     assert_param(hrtc != NULL);
+
+    if (hpwr == NULL || hrtc == NULL) {
+        return HAL_ERROR;
+    }
 
     hpwr->hrtc = hrtc;
     hpwr->rtc_init_flag = false;
@@ -30,7 +34,6 @@ void PwrManager_Init(PwrManager_Handle_t *hpwr, RTC_HandleTypeDef *hrtc) {
     hpwr->wu_tim_flag = false;
     hpwr->is_retained_valid = false;
 
-    // dont delete this, pls
     __HAL_RCC_RTCAPB_CLK_ENABLE();
 
     check_all_flags(hpwr);
@@ -40,6 +43,8 @@ void PwrManager_Init(PwrManager_Handle_t *hpwr, RTC_HandleTypeDef *hrtc) {
         retained.magic = RETAINED_MAGIC;
         retained.counter = 0;
     }
+
+    return HAL_OK;
 }
 
 PwrManager_Retained_t* PwrManager_GetRetained(void) {

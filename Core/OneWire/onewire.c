@@ -25,10 +25,15 @@ static void set_pin(const GPIO_Pin_t *pin);
 static void reset_pin(const GPIO_Pin_t *pin);
 static uint8_t read_pin(const GPIO_Pin_t *pin);
 
-OneWire_Status_t OneWire_Init(OneWire_Handle_t *how, const OneWire_Config_t *config) {
-    assert_param(how != NULL && config != NULL);
+static bool validate_config(const OneWire_Config_t *config);
 
-    if (how == NULL || config == NULL) {
+OneWire_Status_t OneWire_Init(OneWire_Handle_t *how, const OneWire_Config_t *config) {
+    assert_param(how != NULL);
+    assert_param(config != NULL);
+    assert_param(config->htim != NULL);
+    assert_param(config->data_pin != NULL);
+
+    if (how == NULL || !validate_config(config)) {
         return OW_STATUS_NULL_ARG;
     }
     how->config = *config;
@@ -77,7 +82,8 @@ OneWire_Status_t OneWire_Master_Reset(OneWire_Handle_t *how) {
 }
 
 OneWire_Status_t OneWire_Master_Transmit(OneWire_Handle_t *how, const uint8_t *data, const uint8_t len) {
-    assert_param(how != NULL && data != NULL);
+    assert_param(how != NULL);
+    assert_param(data != NULL);
 
     if (how == NULL || data == NULL) {
         return OW_STATUS_NULL_ARG;
@@ -105,7 +111,8 @@ OneWire_Status_t OneWire_Master_Transmit(OneWire_Handle_t *how, const uint8_t *d
 }
 
 OneWire_Status_t OneWire_Master_Receive(OneWire_Handle_t *how, uint8_t *data, const uint8_t len) {
-    assert_param(how != NULL && data != NULL);
+    assert_param(how != NULL);
+    assert_param(data != NULL);
 
     if (how == NULL || data == NULL) {
         return OW_STATUS_NULL_ARG;
@@ -158,6 +165,13 @@ void OneWire_ClearError(OneWire_Handle_t *how) {
 void OneWire_OnTimerCplt(OneWire_Handle_t *how) {
     assert_param(how != NULL);
     one_wire_task(how);
+}
+
+static bool validate_config(const OneWire_Config_t *config) {
+    if (config == NULL) return false;
+    if (config->htim == NULL) return false;
+    if (config->data_pin == NULL) return false;
+    return true;
 }
 
 static void one_wire_task(OneWire_Handle_t *how) {

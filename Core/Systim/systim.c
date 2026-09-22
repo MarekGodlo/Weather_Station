@@ -11,6 +11,8 @@
 static TIM_HandleTypeDef *sys_htim;
 
 HAL_StatusTypeDef Systim_Init(TIM_HandleTypeDef *htim) {
+    assert_param(htim != NULL);
+
     if (htim == NULL) return HAL_ERROR;
 
     sys_htim = htim;

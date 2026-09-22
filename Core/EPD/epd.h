@@ -14,7 +14,21 @@
 #include "EPD_Driver/uc8253.h"
 #include "../GFX/gfx.h"
 
-#define EPD_PARTIAL_BUFFER_SIZE 12480
+#define EPD_WIDTH 240                /**< EPD display width in pixels. */
+#define EPD_HEIGHT 416               /**< EPD display height in pixels. */
+#define EPD_SIZE ((EPD_WIDTH * EPD_HEIGHT)/8) /**< Total size of the frame buffer in bytes. */
+
+#define EPD_PARTIAL_BUFFER_SIZE 12480 /**< Buffer size for partial display updates. */
+
+/**
+ * @brief Represents GPIO pins used by the EPD display.
+ */
+typedef struct {
+    GPIO_Pin_t cs;   /**< Chip Select pin. */
+    GPIO_Pin_t dc;   /**< Data/Command control pin. */
+    GPIO_Pin_t busy; /**< Busy status pin. */
+    GPIO_Pin_t res;  /**< Reset pin. */
+} EPD_Pins_t;
 
 /**
  * @brief Represents the status code returned by EPD driver functions.
@@ -37,6 +51,7 @@ typedef struct {
     uint16_t frame_size;             /**< Size of the frame buffers, in bytes. */
     UC8253_Handle_t hdrv;            /**< Low-level EPD driver handle. */
     GFX_Rotation_t display_rotation; /**< Desired display rotation. */
+    bool skip_frame_buf_clr;         /**< If true, frame buffer clearing is skipped (used for retention). */
 } EPD_Config_t;
 
 /**
@@ -76,7 +91,8 @@ EPD_Status_t EPD_Init(EPD_Handle_t *hepd, const EPD_Config_t *config);
  *
  * @return Status of the operation.
  */
-EPD_Status_t EPD_DrawChar(EPD_Handle_t *hepd, int16_t x, int16_t y, char c, const GFX_Font_t *font, uint8_t color);
+EPD_Status_t EPD_DrawChar(EPD_Handle_t *hepd, int16_t x, int16_t y,
+                          char c, const GFX_Font_t *font, uint8_t color);
 
 /**
  * @brief Draws a single character with a background color on the display.
@@ -91,7 +107,8 @@ EPD_Status_t EPD_DrawChar(EPD_Handle_t *hepd, int16_t x, int16_t y, char c, cons
  *
  * @return Status of the operation.
  */
-EPD_Status_t EPD_DrawCharBg(EPD_Handle_t *hepd, int16_t x, int16_t y, char c, const GFX_Font_t *font, uint8_t color, uint8_t bg);
+EPD_Status_t EPD_DrawCharBg(EPD_Handle_t *hepd, int16_t x, int16_t y, char c,
+                            const GFX_Font_t *font, uint8_t color, uint8_t bg);
 
 /**
  * @brief Draws a text string on the display.
@@ -105,7 +122,8 @@ EPD_Status_t EPD_DrawCharBg(EPD_Handle_t *hepd, int16_t x, int16_t y, char c, co
  *
  * @return Status of the operation.
  */
-EPD_Status_t EPD_DrawText(EPD_Handle_t *hepd, int16_t x, int16_t y, const char *text, const GFX_Font_t *font, uint8_t color);
+EPD_Status_t EPD_DrawText(EPD_Handle_t *hepd, int16_t x, int16_t y,
+                          const char *text, const GFX_Font_t *font, uint8_t color);
 
 /**
  * @brief Draws a text string with a background color on the display.
@@ -120,7 +138,9 @@ EPD_Status_t EPD_DrawText(EPD_Handle_t *hepd, int16_t x, int16_t y, const char *
  *
  * @return Status of the operation.
  */
-EPD_Status_t EPD_DrawTextBg(EPD_Handle_t *hepd, int16_t x, int16_t y, const char *text, const GFX_Font_t *font, uint8_t color, uint8_t bg);
+EPD_Status_t EPD_DrawTextBg(EPD_Handle_t *hepd, int16_t x, int16_t y,
+                            const char *text, const GFX_Font_t *font, uint8_t color,
+                            uint8_t bg);
 
 /**
  * @brief Draws a vertical line on the display.
@@ -134,7 +154,8 @@ EPD_Status_t EPD_DrawTextBg(EPD_Handle_t *hepd, int16_t x, int16_t y, const char
  *
  * @return Status of the operation.
  */
-EPD_Status_t EPD_DrawVLine(EPD_Handle_t *hepd, int16_t x, int16_t y, uint16_t len, uint16_t thickness, uint8_t color);
+EPD_Status_t EPD_DrawVLine(EPD_Handle_t *hepd, int16_t x, int16_t y,
+                           uint16_t len, uint16_t thickness, uint8_t color);
 
 /**
  * @brief Draws a horizontal line on the display.
@@ -148,7 +169,8 @@ EPD_Status_t EPD_DrawVLine(EPD_Handle_t *hepd, int16_t x, int16_t y, uint16_t le
  *
  * @return Status of the operation.
  */
-EPD_Status_t EPD_DrawHLine(EPD_Handle_t *hepd, int16_t x, int16_t y, uint16_t len, uint16_t thickness, uint8_t color);
+EPD_Status_t EPD_DrawHLine(EPD_Handle_t *hepd, int16_t x, int16_t y,
+                           uint16_t len, uint16_t thickness, uint8_t color);
 
 /**
  * @brief Draws a bitmap on the display.
@@ -163,7 +185,9 @@ EPD_Status_t EPD_DrawHLine(EPD_Handle_t *hepd, int16_t x, int16_t y, uint16_t le
  *
  * @return Status of the operation.
  */
-EPD_Status_t EPD_DrawBitmap(EPD_Handle_t *hepd, int16_t x, int16_t y, const uint8_t *bitmap, uint16_t w, uint16_t h, uint8_t color);
+EPD_Status_t EPD_DrawBitmap(EPD_Handle_t *hepd, int16_t x, int16_t y,
+                            const uint8_t *bitmap, uint16_t w, uint16_t h,
+                            uint8_t color);
 
 /**
  * @brief Draws a bitmap with a background color on the display.
@@ -179,7 +203,9 @@ EPD_Status_t EPD_DrawBitmap(EPD_Handle_t *hepd, int16_t x, int16_t y, const uint
  *
  * @return Status of the operation.
  */
-EPD_Status_t EPD_DrawBitmapBg(EPD_Handle_t *hepd, int16_t x, int16_t y, const uint8_t *bitmap, uint16_t w, uint16_t h, uint8_t color, uint8_t bg);
+EPD_Status_t EPD_DrawBitmapBg(EPD_Handle_t *hepd, int16_t x, int16_t y,
+                              const uint8_t *bitmap, uint16_t w, uint16_t h,
+                              uint8_t color, uint8_t bg);
 
 
 /**
@@ -194,7 +220,8 @@ EPD_Status_t EPD_DrawBitmapBg(EPD_Handle_t *hepd, int16_t x, int16_t y, const ui
  *
  * @return Status of the operation.
  */
-EPD_Status_t EPD_FillRegion(EPD_Handle_t *hepd, int16_t x, int16_t y, uint16_t w, uint16_t h, uint8_t color);
+EPD_Status_t EPD_FillRegion(EPD_Handle_t *hepd, int16_t x, int16_t y,
+                            uint16_t w, uint16_t h, uint8_t color);
 
 /**
  * @brief Updates the entire display with the contents of the GFX buffer.

@@ -18,6 +18,10 @@ void GFX_Init(GFX_Handle_t *hgfx, const GFX_Config_t *config) {
     assert_param(hgfx != NULL);
     assert_param(config != NULL);
 
+    if (hgfx == NULL || config == NULL) {
+        return;
+    }
+
     hgfx->config = *config;
 
     hgfx->vr_height = hgfx->config.height;
